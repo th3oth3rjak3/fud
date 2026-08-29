@@ -621,6 +621,28 @@ Do not build a complicated reflection system.
 
 Use Zig's comptime facilities directly.
 
+## Comptime Diagnostics
+
+Fud's comptime validation is part of its developer experience.
+
+Invalid application definitions must produce clear, actionable compiler
+diagnostics rather than relying on incidental Zig type errors.
+
+Validation should:
+
+- Check one contract requirement at a time.
+- Detect missing declarations before accessing them.
+- Report the declaration/function responsible for the failure.
+- Show the expected signature.
+- Show the discovered signature when practical.
+- Explain why the requirement exists.
+- Provide a minimal correction/example.
+- Use consistent Fud-specific diagnostic wording.
+
+The goal is that a developer unfamiliar with Fud should be able to fix an
+invalid App definition from the compiler output without needing to search
+through framework internals.
+
 ---
 
 # 12. Phase 2 — Design the Declarative View System

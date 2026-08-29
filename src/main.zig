@@ -1,6 +1,17 @@
 const std = @import("std");
 const fud = @import("fud");
 
-pub fn main() void {
-    std.debug.print("{s}", .{fud.getHelloMessage()});
+const App = struct {
+    pub const Model = struct {
+        count: i32,
+    };
+    pub const Msg = union(enum) {
+        increment,
+        decrement,
+        set_count: i32,
+    };
+};
+
+pub fn main() !void {
+    try fud.run(App);
 }
