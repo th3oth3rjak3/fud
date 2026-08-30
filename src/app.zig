@@ -224,7 +224,7 @@ fn validateMsg(comptime App: type) void {
 // }
 
 // Fails to compile because Msg is a struct.
-// test "validateMsg fails to compile, Msg declaration is enum" {
+// test "validateMsg fails to compile, Msg declaration is struct" {
 //     const App = struct {
 //         pub const Msg = struct {};
 //     };
