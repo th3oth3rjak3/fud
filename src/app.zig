@@ -41,17 +41,7 @@ const std = @import("std");
 pub fn validate(comptime App: type) void {
     validateModel(App);
     validateMsg(App);
-
-    // Verify App.init exists.
-    //
-    // If it does not:
-    //   - Produce a diagnostic explaining that init creates the initial Model.
-    //
-    // If it exists:
-    //   - Verify that it is a function.
-    //   - Verify that it accepts no arguments.
-    //   - Verify that it returns App.Model.
-    //   - Report the expected and actual signatures when invalid.
+    validateInit(App);
 
     // Verify App.update exists.
     //
@@ -144,7 +134,13 @@ test "validateModel accepts an App with a Model declaration" {
 
 /// `validateMsg` verifies that the user-defined `App` type contains
 /// the required `Msg` declaration. It must be a tagged union type
-/// because it simplifies the user experience for all but the most
+/// because it simplifies the user experience for all but the mosttest "validateMsg fails to compile, Msg declaration is enum" {
+//     const App = struct {
+//         pub const Msg = struct {};
+//     };
+
+//     validateMsg(App);
+// }
 /// trivial cases.
 fn validateMsg(comptime App: type) void {
     const missing_msg_error =
@@ -205,6 +201,45 @@ fn validateMsg(comptime App: type) void {
     }
 }
 
+// Fails to compile because it's missing a Msg declaration.
+// test "validateMsg fails to compile, missing Msg declaration" {
+//     const App = struct {};
+//     validateMsg(App);
+// }
+
+// Fails to compile because Msg is a union.
+// test "validateMsg fails to compile, Msg declaration is union" {
+//     const App = struct {
+//         pub const Msg = union {
+//             increment: bool,
+//             decrement: bool,
+//         };
+//     };
+
+//     validateMsg(App);
+// }
+
+// Fails to compile because Msg is an enum.
+// test "validateMsg fails to compile, Msg declaration is enum" {
+//     const App = struct {
+//         pub const Msg = enum {
+//             increment,
+//             decrement,
+//         };
+//     };
+
+//     validateMsg(App);
+// }
+
+// Fails to compile because Msg is a struct.
+// test "validateMsg fails to compile, Msg declaration is enum" {
+//     const App = struct {
+//         pub const Msg = struct {};
+//     };
+
+//     validateMsg(App);
+// }
+
 test "validateMsg accepts an App with a Msg declaration" {
     const AnyRandomAppName = struct {
         pub const Msg = union(enum) {
@@ -216,3 +251,143 @@ test "validateMsg accepts an App with a Msg declaration" {
 
     validateMsg(AnyRandomAppName);
 }
+
+/// `validateInit` ensures that the user provided `App` type contains
+/// a proper `init` function definition that accepts no arguments and returns
+/// an `App.Model`
+fn validateInit(comptime App: type) void {
+    const missing_init_error =
+        \\Fud application contract violation:
+        \\
+        \\The application is missing the required `init` function.
+        \\
+        \\`init` creates the application's initial `Model` before the
+        \\application begins processing messages.
+        \\
+        \\Example:
+        \\
+        \\    pub fn init() Model {
+        \\        return .{
+        \\            .count = 0,
+        \\        };
+        \\    }
+        \\
+        \\Define `init` inside your application type and try again.
+    ;
+
+    const incorrect_init_signature_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `init` function has an incorrect signature.
+        \\
+        \\`init` must take no arguments and return an instance of `Model`.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn init() Model {
+        \\        return .{
+        \\            .count = 0,
+        \\        };
+        \\    }
+        \\
+        \\The return type must be the application's `Model` type.
+    ;
+
+    const init_not_function_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `init` declaration must be a function.
+        \\
+        \\`init` creates the application's initial `Model` before the
+        \\application begins processing messages.
+        \\
+        \\Example:
+        \\
+        \\    pub fn init() Model {
+        \\        return .{
+        \\            .count = 0,
+        \\        };
+        \\    }
+        \\
+        \\Define `init` as a function that takes no arguments and returns
+        \\an instance of the application's `Model` type.
+    ;
+
+    const init_exists = @hasDecl(App, "init");
+    if (!init_exists) {
+        @compileError(missing_init_error);
+    }
+
+    const type_info = @typeInfo(@TypeOf(App.init));
+    switch (type_info) {
+        .@"fn" => |fn_info| {
+            if (fn_info.params.len > 0) {
+                @compileError(incorrect_init_signature_error);
+            }
+
+            const return_type = fn_info.return_type orelse {
+                @compileError(incorrect_init_signature_error);
+            };
+
+            if (return_type != App.Model) {
+                @compileError(incorrect_init_signature_error);
+            }
+        },
+        else => {
+            @compileError(init_not_function_error);
+        },
+    }
+}
+
+test "validateInit accepts an App with a proper init declaration" {
+    const App = struct {
+        const Model = struct {};
+        pub fn init() Model {
+            return Model{};
+        }
+    };
+
+    validateInit(App);
+}
+
+// Fails to compile because it returns void.
+// test "validateInit fails because it returns void" {
+//     const App = struct {
+//         const Model = struct {};
+//         pub fn init() void {}
+//     };
+
+//     validateInit(App);
+// }
+
+// Fails to compile because it takes arguments.
+// test "validateInit fails because it takes arguments" {
+//     const App = struct {
+//         const Model = struct {};
+//         pub fn init(thing: i32) Model {
+//             _ = thing;
+//             return Model{};
+//         }
+//     };
+
+//     validateInit(App);
+// }
+
+// Fails to compile because init is missing.
+// test "validateInit fails because init is missing" {
+//     const App = struct {
+//         const Model = struct {};
+//     };
+
+//     validateInit(App);
+// }
+
+// Fails to compile because init is not a function.
+// test "validateInit fails because init is not a function" {
+//     const App = struct {
+//         const Model = struct {};
+//         const init = 2;
+//     };
+
+//     validateInit(App);
+// }
