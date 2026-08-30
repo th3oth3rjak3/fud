@@ -19,7 +19,7 @@
 /// update call and that may eventually produce a `Msg` to be processed by the application.
 pub fn Cmd(comptime Msg: type) type {
     _ = Msg;
-    return struct {
-        // TODO: decide what a "Cmd" actually is.
+    return union(enum) {
+        none,
     };
 }

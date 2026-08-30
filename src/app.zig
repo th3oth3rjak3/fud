@@ -463,7 +463,7 @@ test "validateUpdate accepts an App with a valid update declaration" {
         pub fn update(model: *Model, message: Msg) cmd.Cmd(Msg) {
             _ = model;
             _ = message;
-            return cmd.Cmd(Msg){};
+            return .none;
         }
     };
 
