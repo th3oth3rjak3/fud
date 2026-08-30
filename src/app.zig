@@ -82,37 +82,35 @@ pub fn validate(comptime App: type) void {
 /// the required `Model` declaration.
 fn validateModel(comptime App: type) void {
     const has_model = @hasDecl(App, "Model");
-    if (has_model) {
-        return;
+    if (!has_model) {
+        @compileError(
+            \\Fud application contract violation:
+            \\
+            \\The application is missing the required `Model` declaration.
+            \\
+            \\`Model` represents the application's state. It is passed to `view`
+            \\to describe the current UI and to `update` to be modified in response
+            \\to messages.
+            \\
+            \\`Model` may be any Zig type.
+            \\
+            \\For example, a struct:
+            \\
+            \\    pub const Model = struct {
+            \\        count: i32,
+            \\    };
+            \\
+            \\Or a union(enum):
+            \\
+            \\    pub const Model = union(enum) {
+            \\        loading,
+            \\        ready,
+            \\        failed,
+            \\    };
+            \\
+            \\Define `Model` inside your application type and try again.
+        );
     }
-
-    @compileError(
-        \\Fud application contract violation:
-        \\
-        \\The application is missing the required `Model` declaration.
-        \\
-        \\`Model` represents the application's state. It is passed to `view`
-        \\to describe the current UI and to `update` to be modified in response
-        \\to messages.
-        \\
-        \\`Model` may be any Zig type.
-        \\
-        \\For example, a struct:
-        \\
-        \\    pub const Model = struct {
-        \\        count: i32,
-        \\    };
-        \\
-        \\Or a union(enum):
-        \\
-        \\    pub const Model = union(enum) {
-        \\        loading,
-        \\        ready,
-        \\        failed,
-        \\    };
-        \\
-        \\Define `Model` inside your application type and try again.
-    );
 }
 
 test "validateModel accepts an App with a Model declaration" {
@@ -133,9 +131,9 @@ test "validateModel accepts an App with a Model declaration" {
 // }
 
 /// `validateMsg` verifies that the user-defined `App` type contains
-/// the required `Msg` declaration. It must be a tagged union type
-/// because it simplifies the user experience for all but the most
-/// trivial cases.
+/// the required `Msg` declaration. `Msg` must be a tagged union because
+/// this provides a consistent way to represent messages with or without
+/// associated data.
 fn validateMsg(comptime App: type) void {
     const missing_msg_error =
         \\Fud application contract violation:
@@ -246,9 +244,9 @@ test "validateMsg accepts an App with a Msg declaration" {
     validateMsg(AnyRandomAppName);
 }
 
-/// `validateInit` ensures that the user provided `App` type contains
+/// `validateInit` ensures that the user-provided `App` type contains
 /// a proper `init` function definition that accepts no arguments and returns
-/// an `App.Model`
+/// an `App.Model`.
 fn validateInit(comptime App: type) void {
     const missing_init_error =
         \\Fud application contract violation:
