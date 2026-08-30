@@ -134,13 +134,7 @@ test "validateModel accepts an App with a Model declaration" {
 
 /// `validateMsg` verifies that the user-defined `App` type contains
 /// the required `Msg` declaration. It must be a tagged union type
-/// because it simplifies the user experience for all but the mosttest "validateMsg fails to compile, Msg declaration is enum" {
-//     const App = struct {
-//         pub const Msg = struct {};
-//     };
-
-//     validateMsg(App);
-// }
+/// because it simplifies the user experience for all but the most
 /// trivial cases.
 fn validateMsg(comptime App: type) void {
     const missing_msg_error =
