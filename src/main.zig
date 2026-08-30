@@ -27,6 +27,12 @@ const App = struct {
         _ = model;
         return .{ .text = "Hello, Fud!" };
     }
+
+    pub const config = fud.Config{
+        .title = "Hello, Config!",
+        .width = 1200,
+        .height = 600,
+    };
 };
 
 pub fn main() !void {

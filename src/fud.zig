@@ -3,15 +3,19 @@
 
 const app = @import("app.zig");
 const cmd = @import("cmd.zig");
-const view = @import("view.zig");
+const config = @import("config.zig");
 const runtime = @import("runtime.zig");
+const view = @import("view.zig");
 
 pub const Cmd = cmd.Cmd;
 pub const View = view.View;
 pub const run = runtime.run;
+pub const Config = config.Config;
 
 test {
-    _ = cmd;
     _ = app;
+    _ = cmd;
+    _ = config;
+    _ = runtime;
     _ = view;
 }

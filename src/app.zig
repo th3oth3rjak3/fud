@@ -15,6 +15,7 @@
 const std = @import("std");
 const cmd = @import("cmd.zig");
 const view_module = @import("view.zig");
+const config_module = @import("config.zig");
 
 /// Validates a user-defined application type at comptime.
 ///
@@ -45,6 +46,7 @@ pub fn validate(comptime App: type) void {
     validateInit(App);
     validateUpdate(App);
     validateView(App);
+    validateConfig(App);
 }
 
 /// `validateModel` verifies that the user-defined `App` type contains
@@ -642,4 +644,77 @@ test "validateView accepts an App with a valid view declaration" {
     };
 
     validateView(App);
+}
+
+/// `validateConfig` verifies that the user-defined `App` type contains
+/// a valid `config` declaration.
+///
+/// `config` defines the runtime configuration required to create the
+/// application's window, including its title, width, and height.
+///
+/// The required declaration is:
+///
+///     pub const config = fud.Config{
+///         .title = "Hello, Fud!",
+///         .width = 800,
+///         .height = 600,
+///
+///     };
+fn validateConfig(comptime App: type) void {
+    const missing_config_error =
+        \\Fud application contract violation:
+        \\
+        \\The application is missing the required `config` declaration.
+        \\
+        \\`config` defines the application's runtime configuration,
+        \\including its window title, width, and height.
+        \\
+        \\Example:
+        \\
+        \\    pub const config = fud.Config{
+        \\        .title = "Hello, Fud!",
+        \\        .width = 800,
+        \\        .height = 600,
+        \\    };
+        \\
+        \\Define `config` inside your application type and try again.
+    ;
+
+    const invalid_config_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `config` declaration has an incorrect type.
+        \\
+        \\`config` must be a `fud.Config` value.
+        \\
+        \\Example:
+        \\
+        \\    pub const config = fud.Config{
+        \\        .title = "Hello, Fud!",
+        \\        .width = 800,
+        \\        .height = 600,
+        \\    };
+        \\
+        \\Define `config` using the `fud.Config` type and try again.
+    ;
+
+    if (!@hasDecl(App, "config")) {
+        @compileError(missing_config_error);
+    }
+
+    if (@TypeOf(App.config) != config_module.Config) {
+        @compileError(invalid_config_error);
+    }
+}
+
+test "validateConfig accepts an App with a valid config declaration" {
+    const App = struct {
+        pub const config = config_module.Config{
+            .title = "Hello, Fud!",
+            .width = 800,
+            .height = 600,
+        };
+    };
+
+    validateConfig(App);
 }

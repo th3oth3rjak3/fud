@@ -11,21 +11,32 @@
 const rl = @import("raylib");
 const app = @import("app.zig");
 const view_module = @import("view.zig");
+const config_module = @import("config.zig");
 
 /// Starts a `fud` application.
 ///
-/// `App` is the application type that defines the application's model,
-/// messages, and MVU lifecycle functions. `fud` uses `App` at compile time
+/// `App` is the application type that defines the application's configuration,
+/// model, messages, and MVU lifecycle functions. `fud` uses `App` at compile time
 /// to validate that it conforms to the required application contract.
 ///
 /// The application type must provide:
 ///
-/// 1. A `Model` type representing the application's state.
+/// 1. A `Config` value defining the application's runtime configuration.
 ///
-/// 2. A `Msg` type representing messages that can be sent to the application.
+///    ```zig
+///    pub const Config = fud.Config{
+///        .title = "Hello, Fud!",
+///        .width = 800,
+///        .height = 600,
+///    };
+///    ```
+///
+/// 2. A `Model` type representing the application's state.
+///
+/// 3. A `Msg` type representing messages that can be sent to the application.
 ///    This is typically a `union(enum)`.
 ///
-/// 3. An `init` function that creates the initial application model.
+/// 4. An `init` function that creates the initial application model.
 ///
 ///    ```zig
 ///    pub fn init() Model {
@@ -33,7 +44,7 @@ const view_module = @import("view.zig");
 ///    }
 ///    ```
 ///
-/// 4. An `update` function that handles messages and mutates the application
+/// 5. An `update` function that handles messages and mutates the application
 ///    model.
 ///
 ///    ```zig
@@ -46,7 +57,7 @@ const view_module = @import("view.zig");
 ///    }
 ///    ```
 ///
-/// 5. A `view` function that declaratively describes the user interface.
+/// 6. A `view` function that declaratively describes the user interface.
 ///    The model is provided as a const pointer so the view cannot mutate
 ///    application state.
 ///
@@ -56,21 +67,17 @@ const view_module = @import("view.zig");
 ///        return .{ .text = "hello, world!" };
 ///    }
 ///    ```
-///
-/// WARNING: This `onError` behavior is not yet implemented.
-///
-/// An optional `onError` function may be provided to handle errors originating
-/// from the `fud` runtime.
-///
-/// Application errors are the responsibility of the application and should
-/// be represented as application-defined messages when they need to
-/// participate in the MVU message loop.
 pub fn run(comptime App: type) !void {
     app.validate(App);
 
     var model: App.Model = App.init();
+    const config: config_module.Config = App.config;
 
-    rl.initWindow(800, 600, "Hello Fud!");
+    rl.initWindow(
+        config.width,
+        config.height,
+        config.title,
+    );
     defer rl.closeWindow();
 
     while (!rl.windowShouldClose()) {
