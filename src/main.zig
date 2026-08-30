@@ -25,8 +25,7 @@ const App = struct {
 
     pub fn view(model: *const Model) fud.View(Msg) {
         _ = model;
-        const v = fud.View(Msg){};
-        return v;
+        return .{ .text = "Hello, Fud!" };
     }
 };
 

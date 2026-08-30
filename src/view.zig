@@ -28,7 +28,8 @@
 /// `Msg` must be the application's message type.
 pub fn View(comptime Msg: type) type {
     _ = Msg;
-    return struct {
-        // TODO: decide how this should actually be implemented.
+
+    return union(enum) {
+        text: [:0]const u8,
     };
 }

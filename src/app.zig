@@ -637,7 +637,7 @@ test "validateView accepts an App with a valid view declaration" {
         pub const Msg = union(enum) {};
         pub fn view(model: *const Model) view_module.View(Msg) {
             _ = model;
-            return view_module.View(Msg){};
+            return .{ .text = "Hello, world!" };
         }
     };
 
