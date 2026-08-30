@@ -8,10 +8,12 @@
 //! `app.zig` defines and validates what an application must provide, while
 //! this module is responsible for executing those definitions.
 
+const std = @import("std");
 const rl = @import("raylib");
 const app = @import("app.zig");
 const view_module = @import("view.zig");
 const config_module = @import("config.zig");
+const memory = @import("memory.zig");
 
 /// Starts a `fud` application.
 ///
@@ -70,8 +72,13 @@ const config_module = @import("config.zig");
 pub fn run(comptime App: type) !void {
     app.validate(App);
 
-    var model: App.Model = App.init();
+    const allocator = memory.allocator();
+    defer memory.deinit();
+
+    var model: App.Model = App.init(allocator);
     const config: config_module.Config = App.config;
+
+    rl.setConfigFlags(rl.ConfigFlags{ .window_resizable = true });
 
     rl.initWindow(
         config.width,
@@ -80,12 +87,20 @@ pub fn run(comptime App: type) !void {
     );
     defer rl.closeWindow();
 
+    var view_arena = std.heap.ArenaAllocator.init(allocator);
+    defer view_arena.deinit();
+
     while (!rl.windowShouldClose()) {
-        const view: view_module.View(App.Msg) = App.view(&model);
+        // TODO: process messages here from the queue
+        // TODO: for now we don't have message handling
+
+        _ = view_arena.reset(.retain_capacity);
+        const view: view_module.View(App.Msg) = App.view(&model, view_arena.allocator());
 
         rl.beginDrawing();
         defer rl.endDrawing();
 
+        rl.clearBackground(rl.Color.black);
         renderView(App, view);
     }
 }

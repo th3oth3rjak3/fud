@@ -12,20 +12,33 @@ const App = struct {
         set_count: i32,
     };
 
-    pub fn init() Model {
-        return Model{ .count = 0 };
+    pub fn init(allocator: std.mem.Allocator) Model {
+        _ = allocator;
+        return Model{ .count = 42 };
     }
 
-    pub fn update(model: *Model, message: Msg) fud.Cmd(Msg) {
+    pub fn deinit(model: *Model, allocator: std.mem.Allocator) void {
+        _ = model;
+        _ = allocator;
+    }
+
+    pub fn update(model: *Model, message: Msg, allocator: std.mem.Allocator) fud.Cmd(Msg) {
         _ = model;
         _ = message;
+        _ = allocator;
         const cmd = fud.Cmd(Msg){};
         return cmd;
     }
 
-    pub fn view(model: *const Model) fud.View(Msg) {
-        _ = model;
-        return .{ .text = "Hello, Fud!" };
+    pub fn view(model: *const Model, allocator: std.mem.Allocator) fud.View(Msg) {
+        const text = std.fmt.allocPrintSentinel(
+            allocator,
+            "Count: {d}",
+            .{model.count},
+            0,
+        ) catch unreachable;
+
+        return .{ .text = text };
     }
 
     pub const config = fud.Config{
