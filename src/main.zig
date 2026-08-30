@@ -22,6 +22,12 @@ const App = struct {
         const cmd = fud.Cmd(Msg){};
         return cmd;
     }
+
+    pub fn view(model: *const Model) fud.View(Msg) {
+        _ = model;
+        const v = fud.View(Msg){};
+        return v;
+    }
 };
 
 pub fn main() !void {

@@ -3,8 +3,10 @@
 
 const app = @import("app.zig");
 const cmd = @import("cmd.zig");
+const view = @import("view.zig");
 
 pub const Cmd = cmd.Cmd;
+pub const View = view.View;
 
 /// Starts a `fud` application.
 ///
@@ -65,4 +67,5 @@ pub fn run(comptime App: type) !void {
 test {
     _ = cmd;
     _ = app;
+    _ = view;
 }

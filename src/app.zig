@@ -14,6 +14,7 @@
 
 const std = @import("std");
 const cmd = @import("cmd.zig");
+const view_module = @import("view.zig");
 
 /// Validates a user-defined application type at comptime.
 ///
@@ -35,7 +36,6 @@ const cmd = @import("cmd.zig");
 /// - `update`: Processes a `Msg`, mutates the `Model`, and returns a
 ///   `fud.Cmd(Msg)`.
 /// - `view`: Declaratively describes the UI from a read-only `Model`.
-/// - `onError`: An optional handler for errors produced by the `fud` runtime.
 ///
 /// Validation should be performed in a predictable order, reporting the
 /// first invalid requirement encountered.
@@ -44,27 +44,7 @@ pub fn validate(comptime App: type) void {
     validateMsg(App);
     validateInit(App);
     validateUpdate(App);
-
-    // Verify App.view exists.
-    //
-    // If it does not:
-    //   - Produce a diagnostic explaining that view describes the UI.
-    //
-    // If it exists:
-    //   - Verify that it is a function.
-    //   - Verify that its parameter is *const App.Model.
-    //   - Verify that it returns fud.View(App.Msg).
-    //   - Report the expected and actual signatures when invalid.
-
-    // Verify App.onError if it exists.
-    //
-    // If it exists:
-    //   - Verify that it is a function.
-    //   - Verify that it conforms to the Fud runtime error handler contract.
-    //   - Report the expected and actual signatures when invalid.
-    //
-    // If it does not exist:
-    //   - This is valid; onError is optional.
+    validateView(App);
 }
 
 /// `validateModel` verifies that the user-defined `App` type contains
@@ -488,4 +468,178 @@ test "validateUpdate accepts an App with a valid update declaration" {
     };
 
     validateUpdate(App);
+}
+
+/// `validateView` verifies that the user-defined `App` type contains
+/// a valid `view` function definition.
+///
+/// `view` describes the application's user interface based on its current
+/// `Model`. It receives a read-only pointer to the application's state and
+/// returns a `View(Msg)` describing the UI.
+///
+/// The required signature is:
+///
+///     pub fn view(model: *const Model) fud.View(Msg)
+///
+/// The parameter must be a `*const App.Model` so that `view` can observe
+/// application state without modifying it. The return type must be
+/// `fud.View(App.Msg)`.
+///
+/// Validation is performed at comptime so that an invalid `view` definition
+/// produces a clear diagnostic before the application can run.
+fn validateView(comptime App: type) void {
+    const missing_view_error =
+        \\Fud application contract violation:
+        \\
+        \\The application is missing the required `view` function.
+        \\
+        \\`view` describes the application's user interface based on its current
+        \\`Model`. The `fud` runtime uses the resulting view to construct and
+        \\update the application's UI.
+        \\
+        \\Example:
+        \\
+        \\    pub fn view(model: *const Model) fud.View(Msg) {
+        \\        _ = model;
+        \\
+        \\        // Describe the application's UI here.
+        \\        return .{};
+        \\    }
+        \\
+        \\Define `view` inside your application type and try again.
+    ;
+
+    const view_not_function_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `view` declaration must be a function.
+        \\
+        \\`view` describes the application's user interface from its current
+        \\`Model` and must return a `fud.View(Msg)`.
+        \\
+        \\Example:
+        \\
+        \\    pub fn view(model: *const Model) fud.View(Msg) {
+        \\        _ = model;
+        \\
+        \\        // Describe the application's UI here.
+        \\        return .{};
+        \\    }
+        \\
+        \\Define `view` as a function with the required signature.
+    ;
+
+    const view_incorrect_parameter_count_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `view` function has an incorrect number of parameters.
+        \\
+        \\`view` must accept exactly one parameter:
+        \\
+        \\    1. `*const Model` — a read-only pointer to the application's state.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn view(model: *const Model) fud.View(Msg) {
+        \\        // ...
+        \\    }
+        \\
+        \\Define `view` with exactly one parameter and try again.
+    ;
+
+    const view_incorrect_model_parameter_error =
+        \\Fud application contract violation:
+        \\
+        \\The parameter of `view` has an incorrect type.
+        \\
+        \\The parameter must be a read-only pointer to the application's `Model`
+        \\type.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn view(model: *const Model) fud.View(Msg) {
+        \\        // ...
+        \\    }
+        \\
+        \\`view` receives a read-only `*const Model` because it describes the UI
+        \\from application state without modifying that state.
+    ;
+
+    const view_incorrect_return_type_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `view` function has an incorrect return type.
+        \\
+        \\`view` must return `fud.View(Msg)`.
+        \\
+        \\`View(Msg)` represents the declarative description of the application's
+        \\user interface and allows user interactions to produce application
+        \\messages.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn view(model: *const Model) fud.View(Msg) {
+        \\        // ...
+        \\    }
+        \\
+        \\Return a `fud.View(Msg)` from `view` and try again.
+    ;
+
+    const has_view = @hasDecl(App, "view");
+    if (!has_view) {
+        @compileError(missing_view_error);
+    }
+
+    const type_info = @typeInfo(@TypeOf(App.view));
+    switch (type_info) {
+        .@"fn" => |fn_info| {
+            if (fn_info.params.len != 1) {
+                @compileError(view_incorrect_parameter_count_error);
+            }
+
+            const model_type = fn_info.params[0].type orelse {
+                @compileError(view_incorrect_model_parameter_error);
+            };
+
+            switch (@typeInfo(model_type)) {
+                .pointer => |ptr_info| {
+                    // Must be const so that the model is read-only.
+                    if (!ptr_info.is_const) {
+                        @compileError(view_incorrect_model_parameter_error);
+                    }
+
+                    if (ptr_info.child != App.Model) {
+                        @compileError(view_incorrect_model_parameter_error);
+                    }
+                },
+                else => {
+                    @compileError(view_incorrect_model_parameter_error);
+                },
+            }
+
+            const return_type = fn_info.return_type orelse {
+                @compileError(view_incorrect_return_type_error);
+            };
+
+            if (return_type != view_module.View(App.Msg)) {
+                @compileError(view_incorrect_return_type_error);
+            }
+        },
+        else => {
+            @compileError(view_not_function_error);
+        },
+    }
+}
+
+test "validateView accepts an App with a valid view declaration" {
+    const App = struct {
+        pub const Model = struct {};
+        pub const Msg = union(enum) {};
+        pub fn view(model: *const Model) view_module.View(Msg) {
+            _ = model;
+            return view_module.View(Msg){};
+        }
+    };
+
+    validateView(App);
 }
