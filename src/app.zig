@@ -13,6 +13,7 @@
 //! imported directly by applications.
 
 const std = @import("std");
+const cmd = @import("cmd.zig");
 
 /// Validates a user-defined application type at comptime.
 ///
@@ -42,19 +43,7 @@ pub fn validate(comptime App: type) void {
     validateModel(App);
     validateMsg(App);
     validateInit(App);
-
-    // Verify App.update exists.
-    //
-    // If it does not:
-    //   - Produce a diagnostic explaining that update processes messages
-    //     and mutates application state.
-    //
-    // If it exists:
-    //   - Verify that it is a function.
-    //   - Verify that its first parameter is App.Msg.
-    //   - Verify that its second parameter is *App.Model.
-    //   - Verify that it returns fud.Cmd(App.Msg).
-    //   - Report the expected and actual signatures when invalid.
+    validateUpdate(App);
 
     // Verify App.view exists.
     //
@@ -123,13 +112,6 @@ test "validateModel accepts an App with a Model declaration" {
     validateModel(AnyRandomAppName);
 }
 
-// Should produce a compilation error when uncommented, missing the Model declaration.
-// test "validateModel rejects an App without a Model declaration" {
-//     const App = struct {};
-
-//     validateModel(App);
-// }
-
 /// `validateMsg` verifies that the user-defined `App` type contains
 /// the required `Msg` declaration. `Msg` must be a tagged union because
 /// this provides a consistent way to represent messages with or without
@@ -192,45 +174,6 @@ fn validateMsg(comptime App: type) void {
         },
     }
 }
-
-// Fails to compile because it's missing a Msg declaration.
-// test "validateMsg fails to compile, missing Msg declaration" {
-//     const App = struct {};
-//     validateMsg(App);
-// }
-
-// Fails to compile because Msg is a union.
-// test "validateMsg fails to compile, Msg declaration is union" {
-//     const App = struct {
-//         pub const Msg = union {
-//             increment: bool,
-//             decrement: bool,
-//         };
-//     };
-
-//     validateMsg(App);
-// }
-
-// Fails to compile because Msg is an enum.
-// test "validateMsg fails to compile, Msg declaration is enum" {
-//     const App = struct {
-//         pub const Msg = enum {
-//             increment,
-//             decrement,
-//         };
-//     };
-
-//     validateMsg(App);
-// }
-
-// Fails to compile because Msg is a struct.
-// test "validateMsg fails to compile, Msg declaration is struct" {
-//     const App = struct {
-//         pub const Msg = struct {};
-//     };
-
-//     validateMsg(App);
-// }
 
 test "validateMsg accepts an App with a Msg declaration" {
     const AnyRandomAppName = struct {
@@ -342,44 +285,207 @@ test "validateInit accepts an App with a proper init declaration" {
     validateInit(App);
 }
 
-// Fails to compile because it returns void.
-// test "validateInit fails because it returns void" {
-//     const App = struct {
-//         const Model = struct {};
-//         pub fn init() void {}
-//     };
+/// `validateUpdate` verifies that the user-defined `App` type contains
+/// a valid `update` function definition.
+///
+/// `update` is the core transition function of the MVU architecture. It
+/// receives the current application `Model` and a `Msg`, applies the
+/// appropriate state transition, and returns a `Cmd(Msg)` describing any
+/// asynchronous work that should be performed by the `fud` runtime.
+///
+/// The required signature is:
+///
+///     pub fn update(model: *Model, msg: Msg) fud.Cmd(Msg)
+///
+/// The first parameter must be a mutable pointer to `App.Model`, allowing
+/// `update` to modify application state. The second parameter must be the
+/// application's `App.Msg` type. The return type must be `fud.Cmd(App.Msg)`.
+///
+/// Validation is performed at comptime so that an invalid `update`
+/// definition produces a clear diagnostic before the application can run.
+fn validateUpdate(comptime App: type) void {
+    const missing_update_error =
+        \\Fud application contract violation:
+        \\
+        \\The application is missing the required `update` function.
+        \\
+        \\`update` processes messages and mutates the application's `Model`.
+        \\It is called by the `fud` runtime whenever a message is received.
+        \\
+        \\Example:
+        \\
+        \\    pub fn update(model: *Model, msg: Msg) fud.Cmd(Msg) {
+        \\        switch (msg) {
+        \\            .increment => model.count += 1,
+        \\            .decrement => model.count -= 1,
+        \\        }
+        \\
+        \\        return .none;
+        \\    }
+        \\
+        \\Define `update` inside your application type and try again.
+    ;
 
-//     validateInit(App);
-// }
+    const update_not_function_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `update` declaration must be a function.
+        \\
+        \\`update` processes messages and mutates the application's `Model`.
+        \\It must accept a mutable pointer to `Model` and a `Msg`, then return
+        \\a `fud.Cmd(Msg)`.
+        \\
+        \\Example:
+        \\
+        \\    pub fn update(model: *Model, msg: Msg) fud.Cmd(Msg) {
+        \\        switch (msg) {
+        \\            .increment => model.count += 1,
+        \\            .decrement => model.count -= 1,
+        \\        }
+        \\
+        \\        return .none;
+        \\    }
+        \\
+        \\Define `update` as a function with the required signature.
+    ;
 
-// Fails to compile because it takes arguments.
-// test "validateInit fails because it takes arguments" {
-//     const App = struct {
-//         const Model = struct {};
-//         pub fn init(thing: i32) Model {
-//             _ = thing;
-//             return Model{};
-//         }
-//     };
+    const update_incorrect_parameter_count_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `update` function has an incorrect number of parameters.
+        \\
+        \\`update` must accept exactly two parameters:
+        \\
+        \\    1. `*Model` — a mutable pointer to the application's state.
+        \\    2. `Msg` — the message being processed.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn update(model: *Model, msg: Msg) fud.Cmd(Msg) {
+        \\        // ...
+        \\    }
+        \\
+        \\Define `update` with exactly two parameters and try again.
+    ;
 
-//     validateInit(App);
-// }
+    const update_incorrect_model_parameter_error =
+        \\Fud application contract violation:
+        \\
+        \\The first parameter of `update` has an incorrect type.
+        \\
+        \\The first parameter must be a mutable pointer to the application's
+        \\`Model` type.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn update(model: *Model, msg: Msg) fud.Cmd(Msg) {
+        \\        // ...
+        \\    }
+        \\
+        \\The `*Model` parameter allows `update` to modify application state
+        \\in response to a message.
+    ;
 
-// Fails to compile because init is missing.
-// test "validateInit fails because init is missing" {
-//     const App = struct {
-//         const Model = struct {};
-//     };
+    const update_incorrect_msg_parameter_error =
+        \\Fud application contract violation:
+        \\
+        \\The second parameter of `update` has an incorrect type.
+        \\
+        \\The second parameter must be the application's `Msg` type.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn update(model: *Model, msg: Msg) fud.Cmd(Msg) {
+        \\        // ...
+        \\    }
+        \\
+        \\The `Msg` parameter represents the message currently being processed
+        \\by the application.
+    ;
 
-//     validateInit(App);
-// }
+    const update_incorrect_return_type_error =
+        \\Fud application contract violation:
+        \\
+        \\The application's `update` function has an incorrect return type.
+        \\
+        \\`update` must return `fud.Cmd(Msg)`.
+        \\
+        \\`Cmd(Msg)` represents work that `fud` may perform after the current
+        \\message has been processed and may eventually produce another `Msg`.
+        \\
+        \\Expected:
+        \\
+        \\    pub fn update(model: *Model, msg: Msg) fud.Cmd(Msg) {
+        \\        // ...
+        \\    }
+        \\
+        \\Return a `fud.Cmd(Msg)` from `update` and try again.
+    ;
 
-// Fails to compile because init is not a function.
-// test "validateInit fails because init is not a function" {
-//     const App = struct {
-//         const Model = struct {};
-//         const init = 2;
-//     };
+    const has_update = @hasDecl(App, "update");
+    if (!has_update) {
+        @compileError(missing_update_error);
+    }
 
-//     validateInit(App);
-// }
+    const type_info = @typeInfo(@TypeOf(App.update));
+    switch (type_info) {
+        .@"fn" => |fn_info| {
+            if (fn_info.params.len != 2) {
+                @compileError(update_incorrect_parameter_count_error);
+            }
+
+            const model_type = fn_info.params[0].type orelse {
+                @compileError(update_incorrect_parameter_count_error);
+            };
+
+            const msg_type = fn_info.params[1].type orelse {
+                @compileError(update_incorrect_parameter_count_error);
+            };
+
+            switch (@typeInfo(model_type)) {
+                .pointer => |ptr_info| {
+                    if (ptr_info.is_const) {
+                        @compileError(update_incorrect_model_parameter_error);
+                    }
+
+                    if (ptr_info.child != App.Model) {
+                        @compileError(update_incorrect_model_parameter_error);
+                    }
+                },
+                else => {
+                    @compileError(update_incorrect_model_parameter_error);
+                },
+            }
+
+            if (msg_type != App.Msg) {
+                @compileError(update_incorrect_msg_parameter_error);
+            }
+
+            const return_type = fn_info.return_type orelse {
+                @compileError(update_incorrect_return_type_error);
+            };
+
+            if (return_type != cmd.Cmd(App.Msg)) {
+                @compileError(update_incorrect_return_type_error);
+            }
+        },
+        else => {
+            @compileError(update_not_function_error);
+        },
+    }
+}
+
+test "validateUpdate accepts an App with a valid update declaration" {
+    const App = struct {
+        const Model = struct {};
+        const Msg = union(enum) {};
+
+        pub fn update(model: *Model, message: Msg) cmd.Cmd(Msg) {
+            _ = model;
+            _ = message;
+            return cmd.Cmd(Msg){};
+        }
+    };
+
+    validateUpdate(App);
+}

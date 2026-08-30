@@ -15,6 +15,13 @@ const App = struct {
     pub fn init() Model {
         return Model{ .count = 0 };
     }
+
+    pub fn update(model: *Model, message: Msg) fud.Cmd(Msg) {
+        _ = model;
+        _ = message;
+        const cmd = fud.Cmd(Msg){};
+        return cmd;
+    }
 };
 
 pub fn main() !void {

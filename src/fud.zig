@@ -2,6 +2,9 @@
 //! that aims to simplify creating applications.
 
 const app = @import("app.zig");
+const cmd = @import("cmd.zig");
+
+pub const Cmd = cmd.Cmd;
 
 /// Starts a `fud` application.
 ///
@@ -60,5 +63,6 @@ pub fn run(comptime App: type) !void {
 }
 
 test {
+    _ = cmd;
     _ = app;
 }
